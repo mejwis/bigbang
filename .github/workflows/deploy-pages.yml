@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "*.html"
+      - "big-bang*.html"
       - ".github/workflows/deploy-pages.yml"
 
   workflow_dispatch:
@@ -31,26 +31,33 @@ jobs:
       - name: Načíst repozitář
         uses: actions/checkout@v6
 
-      - name: Najít nejnovější HTML build
+      - name: Připravit aktuální BIG BANG build
         shell: bash
         run: |
           set -euo pipefail
 
-          BUILD_FILE=$(find . -maxdepth 1 -type f \
-            -name "big-bang*.html" \
-            ! -name "index.html" \
-            -printf "%T@ %p\n" \
-            | sort -nr \
-            | head -n 1 \
-            | cut -d' ' -f2-)
+          BUILD_FILE=$(git diff-tree \
+            --no-commit-id \
+            --name-only \
+            -r "$GITHUB_SHA" \
+            | grep -E '^big-bang.*\.html$' \
+            | tail -n 1 || true)
 
           if [ -z "$BUILD_FILE" ]; then
+            BUILD_FILE=$(find . -maxdepth 1 -type f \
+              -name "big-bang*.html" \
+              | sort \
+              | tail -n 1)
+          fi
+
+          if [ -z "$BUILD_FILE" ] || [ ! -f "$BUILD_FILE" ]; then
             echo "Nebyl nalezen žádný BIG BANG HTML build."
             exit 1
           fi
 
           echo "Publikuji: $BUILD_FILE"
 
+          rm -rf public
           mkdir -p public
           cp "$BUILD_FILE" public/index.html
 
